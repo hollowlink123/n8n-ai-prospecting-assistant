@@ -1,0 +1,345 @@
+{
+  "name": "Freelancer Agent — Discovery Call Prep (F5) sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "c741427e-93ef-4a89-bf1a-8ee6c58bc0b7",
+      "name": "Every 15 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1AslH2SfF8ykqu-GWRlAs27WXd_jM4LgMl5cH7Bki8-s",
+          "mode": "list",
+          "cachedResultName": "freelnc",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1AslH2SfF8ykqu-GWRlAs27WXd_jM4LgMl5cH7Bki8-s/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "prospects"
+        },
+        "options": {}
+      },
+      "id": "adee1d65-d0a3-40db-8f97-dd0823f257be",
+      "name": "Read Prospects",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        112
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// >>> SETUP: change TIMEZONE to your own, e.g. 'America/New_York', 'Europe/London', 'Asia/Dubai' <<<\nconst TIMEZONE = 'America/New_York';\n\nconst rows = $input.all().map(i => i.json).filter(r => r && Object.keys(r).length > 0);\nconst nowMs = $now.toMillis();\nconst windowEndMs = nowMs + 45 * 60 * 1000;\nconst out = [];\nfor (const r of rows) {\n  const sent = String(r.call_prep_sent || '').toLowerCase();\n  if (sent === 'true') continue;\n  const raw = r.call_at;\n  if (!raw) continue;\n  const ms = new Date(raw).getTime();\n  if (isNaN(ms)) continue;\n  if (ms < nowMs || ms > windowEndMs) continue;\n\n  out.push({ json: {\n    lead_id: r.lead_id,\n    contact_name: r.contact_name || '',\n    company: r.company || '',\n    domain: r.domain || '',\n    url: r.domain ? ('https://' + String(r.domain).replace(/^https?:\\/\\//i,'')) : '',\n    notes: r.notes || '',\n    research_brief: r.research_brief || '',\n    chat_id: String(r.chat_id || ''),\n    hasChat: !!(r.chat_id),\n    callTimeLabel: $now.plus({ milliseconds: ms - nowMs }).setZone(TIMEZONE).toFormat('t'),\n  }});\n}\nreturn out;"
+      },
+      "id": "a66e5272-9003-4135-ad14-fd11a48d3653",
+      "name": "Filter Call Window",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "text/html,application/xhtml+xml"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 5
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "23c46347-3f90-4a4f-9c91-30bc2af8d559",
+      "name": "Refresh Homepage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        672,
+        112
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst status = item.statusCode || 0;\nconst html = typeof item.body === 'string' ? item.body : '';\nconst ctx = $('Filter Call Window').item.json;\n\nfunction pick(re){ const m = html.match(re); return m ? (m[1]||'').trim() : ''; }\nconst title = pick(/<title[^>]*>([\\s\\S]*?)<\\/title>/i);\nconst metaDesc = pick(/<meta[^>]+name=[\"']description[\"'][^>]+content=[\"']([^\"']*)[\"']/i);\nconst h1s = (html.match(/<h1[^>]*>([\\s\\S]*?)<\\/h1>/gi) || [])\n  .map(h => h.replace(/<[^>]+>/g,'').trim()).filter(Boolean).slice(0,5);\nconst hasBlog = /href=[\"'][^\"']*\\/blog/i.test(html);\nconst hasOnlineOrdering = /(order online|order now|add to cart|checkout|book (a )?table|reservation)/i.test(html);\nconst social = [];\nif(/instagram\\.com\\//i.test(html)) social.push('instagram');\nif(/facebook\\.com\\//i.test(html)) social.push('facebook');\nif(/linkedin\\.com\\//i.test(html)) social.push('linkedin');\n\nlet text = html.replace(/<script[\\s\\S]*?<\\/script>/gi,' ').replace(/<style[\\s\\S]*?<\\/style>/gi,' ')\n  .replace(/<[^>]+>/g,' ').replace(/&nbsp;/gi,' ').replace(/\\s+/g,' ').trim();\nconst wordCount = text ? text.split(' ').length : 0;\nconst fetchOk = status >= 200 && status < 400 && html.length > 200;\nconst likelyJsRendered = fetchOk && wordCount < 60;\n\nreturn [{ json: Object.assign({}, ctx, {\n  title, metaDesc, h1s, hasBlog, hasOnlineOrdering,\n  social, fetchOk, likelyJsRendered,\n  textSample: text.slice(0, 2500),\n}) }];"
+      },
+      "id": "ee658de8-a7a2-438f-9b42-49376b0c0d33",
+      "name": "Extract Signals",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Build a discovery-call prep brief using ONLY the data below.\n\nContact: {{ $json.contact_name }}\nCompany: {{ $json.company }}\nDomain: {{ $json.domain }}\nCall time: {{ $json.callTimeLabel }}\nStored notes: {{ $json.notes }}\nStored research brief: {{ $json.research_brief }}\nLive refresh OK: {{ $json.fetchOk }} | Likely JS-rendered/blocked: {{ $json.likelyJsRendered }}\nSite title: {{ $json.title }}\nMeta description: {{ $json.metaDesc }}\nH1 headings: {{ $json.h1s }}\nBlog present: {{ $json.hasBlog }}\nOnline ordering signal: {{ $json.hasOnlineOrdering }}\nSocial links: {{ $json.social }}\nVisible text sample: {{ $json.textSample }}",
+        "options": {
+          "systemMessage": "You prepare a freelancer for a discovery call.\n\nSTRICT GROUNDING:\n- Use ONLY the stored notes/research and the freshly extracted site signals. Do NOT invent revenue, employee counts, funding, growth %, or facts about the person.\n- Label pain points as inferences, not facts.\n- If Live refresh OK is false or Likely JS-rendered/blocked is true, add a short note that the live site refresh was partial and the brief leans on stored data.\n- Where a fact is unknown, leave a [bracketed placeholder] instead of guessing.\n\nOutput plain text, Telegram-friendly:\n📞 Call Prep: <contact> — <company> (<call time>)\n- About: what the company does (from signals/notes)\n- Likely pain points (inferences): 2-3 items\n- Suggested opening line: one grounded sentence\n- Discovery questions: 4-5 numbered questions\n- Your USP to mention: one line drawn from the stored notes\nUnder ~1800 characters. No sign-off.",
+          "enableStreaming": false
+        }
+      },
+      "id": "5624eb9c-420c-49fb-8232-24d07661d312",
+      "name": "Call Prep Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1120,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.4
+        }
+      },
+      "id": "bcbc1fd3-6bd9-4159-b0a9-e85f6cc71522",
+      "name": "OpenAI Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1200,
+        336
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "n8n credits",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $(\"Filter Call Window\").item.json.chat_id }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "ff193fa6-b61a-41d2-867f-c1783c7c7772",
+      "name": "Send Call Prep",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1472,
+        112
+      ],
+      "webhookId": "204903e9-920b-4ae9-a4d4-c887615b0d4d",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1AslH2SfF8ykqu-GWRlAs27WXd_jM4LgMl5cH7Bki8-s",
+          "mode": "list",
+          "cachedResultName": "freelnc",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1AslH2SfF8ykqu-GWRlAs27WXd_jM4LgMl5cH7Bki8-s/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "prospects"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "lead_id"
+          ],
+          "value": {
+            "lead_id": "={{ $(\"Filter Call Window\").item.json.lead_id }}",
+            "call_prep_sent": "true"
+          },
+          "schema": [
+            {
+              "id": "lead_id",
+              "displayName": "lead_id",
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "call_prep_sent",
+              "displayName": "call_prep_sent",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "275bcc14-4692-4101-bd23-9ddcbeb247b5",
+      "name": "Mark Prep Sent",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1696,
+        112
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 15 min": {
+      "main": [
+        [
+          {
+            "node": "Read Prospects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Prospects": {
+      "main": [
+        [
+          {
+            "node": "Filter Call Window",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Call Window": {
+      "main": [
+        [
+          {
+            "node": "Refresh Homepage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refresh Homepage": {
+      "main": [
+        [
+          {
+            "node": "Extract Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Signals": {
+      "main": [
+        [
+          {
+            "node": "Call Prep Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Prep Agent": {
+      "main": [
+        [
+          {
+            "node": "Send Call Prep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Call Prep Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Call Prep": {
+      "main": [
+        [
+          {
+            "node": "Mark Prep Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "errorWorkflow": "ewa56KIP8xaFiHTG"
+  },
+  "versionId": "5032c31e-be39-45a6-99e5-6cc63193d2e3",
+  "meta": {
+    "instanceId": "bbe63525abda93c4dffbb2bab32ee46dd97dc7395c0c926270cce113ce106012"
+  },
+  "nodeGroups": [],
+  "id": "lof1dfZgGVWacfDk",
+  "tags": []
+}

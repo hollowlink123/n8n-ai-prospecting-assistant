@@ -1,0 +1,351 @@
+{
+  "name": "Freelancer Agent — Scrape Contact (tool) sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "url"
+            },
+            {
+              "name": "name"
+            },
+            {
+              "name": "known_phone"
+            },
+            {
+              "name": "known_address"
+            },
+            {
+              "name": "known_hours"
+            },
+            {
+              "name": "known_rating"
+            },
+            {
+              "name": "known_maps"
+            }
+          ]
+        }
+      },
+      "id": "52d12112-20f1-4d7f-857a-771ef2c988ce",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 5
+            }
+          },
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "42bee7ff-0ad1-4d77-a00f-0fe5b51daf32",
+      "name": "Fetch Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        0
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://app.scrapingbee.com/api/v1/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "={{ $(\"When Called\").first().json.url }}"
+            },
+            {
+              "name": "render_js",
+              "value": "true"
+            },
+            {
+              "name": "block_resources",
+              "value": "false"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 40000
+        }
+      },
+      "id": "64117d78-d329-430b-bce0-09ae75c1ba2e",
+      "name": "Fetch Rendered",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        0
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://r.jina.ai/{{ $(\"When Called\").first().json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Return-Format",
+              "value": "html"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "a7c19d20-4e51-4f11-bb31-6f0b6d9e77aa",
+      "name": "Fetch via Reader",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        672,
+        0
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inp = $('When Called').first().json || {};\nconst called = inp.url || '';\nconst knownPhone = (inp.known_phone || '').toString().trim();\nconst knownAddress = (inp.known_address || '').toString().trim();\nconst knownHours = (inp.known_hours || '').toString().trim();\nconst knownRating = (inp.known_rating || '').toString().trim();\nconst knownMaps = (inp.known_maps || '').toString().trim();\nconst name = (inp.name || '').toString().trim();\n\nconst result = { url: called, name: name, emails: [], phones: [], social: {}, address: knownAddress, hours: knownHours, rating: knownRating, maps: knownMaps, note: '' };\n\n// --- Gather content from raw fetch, rendered fetch (ScrapingBee), and the free Jina reader proxy ---\nlet html = '';\nlet readerOk = false;\nconst sources = ['Fetch Page', 'Fetch Rendered', 'Fetch via Reader'];\nfor (const s of sources) {\n  let it = null;\n  try { it = $(s).first().json; } catch (e) { it = null; }\n  if (!it) continue;\n  if (it.error || it.errorMessage) continue;\n  const h = typeof it.data === 'string' ? it.data : (typeof it.body === 'string' ? it.body : '');\n  if (h) { html += '\\n' + h; if (s === 'Fetch via Reader' && h.length > 200) readerOk = true; }\n}\n\nconst lowerHtml = (html || '').toLowerCase();\n// Cloudflare / JS challenge detection (FIXED: no trailing empty alternative that matched everything)\nconst challengeRe = /(just a moment|enable javascript and cookies|cf_chl_opt|challenge-platform|_cf_chl|attention required|checking your browser|please enable js)/i;\nconst isChallenge = challengeRe.test(lowerHtml) && lowerHtml.length < 15000 && !readerOk;\nconst pageReadable = html && html.length >= 50 && !isChallenge;\n\nfunction decodeCf(hex) { try { const r = parseInt(hex.substr(0, 2), 16); let out = ''; for (let i = 2; i < hex.length; i += 2) { out += String.fromCharCode(parseInt(hex.substr(i, 2), 16) ^ r); } return out; } catch (e) { return ''; } }\n\nconst emailSet = new Set();\nconst phoneSet = new Set();\nconst sset = {};\nconst social_patterns = { facebook: /facebook\\.com\\//i, instagram: /instagram\\.com\\//i, linkedin: /linkedin\\.com\\//i, twitter: /(twitter\\.com|x\\.com)\\//i, youtube: /youtube\\.com\\//i, tiktok: /tiktok\\.com\\//i };\nfor (const k of Object.keys(social_patterns)) sset[k] = new Set();\n\nfunction addSocial(link) {\n  for (const k of Object.keys(social_patterns)) {\n    if (social_patterns[k].test(link)) {\n      if (/sharer|intent|share\\?|\\/plugins\\/|\\/share|\\/tr\\?/i.test(link)) return;\n      let clean = link.split('?')[0].replace(/[\\)\\]\\.,'\\\"<> ]+$/, '');\n      // skip bare platform roots like instagram.com/ with nothing after\n      const after = clean.replace(/^https?:\\/\\/(www\\.)?[^\\/]+\\//i, '');\n      if (after.length < 2) return;\n      sset[k].add(clean);\n    }\n  }\n}\n\nif (pageReadable) {\n  // Cloudflare-obfuscated emails\n  const cfM = html.match(/data-cfemail=\\\"([a-f0-9]+)\\\"/gi) || [];\n  for (const m of cfM) { const hex = m.replace(/data-cfemail=\\\"/i, '').replace(/\\\"$/, ''); const d = decodeCf(hex); if (d && d.indexOf('@') > -1) emailSet.add(d.toLowerCase()); }\n  const cfH = html.match(/email-protection#([a-f0-9]+)/gi) || [];\n  for (const m of cfH) { const hex = m.split('#')[1]; const d = decodeCf(hex); if (d && d.indexOf('@') > -1) emailSet.add(d.toLowerCase()); }\n  // mailto + plain emails\n  const mails = html.match(/mailto:([^\\\"'?>\\s]+)/gi) || [];\n  for (const m of mails) { const e = m.replace(/mailto:/i, '').trim().toLowerCase(); if (e.indexOf('@') > -1) emailSet.add(e); }\n  const plain = html.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/g) || [];\n  for (const e of plain) { const le = e.toLowerCase(); if (!/\\.(png|jpe?g|gif|svg|webp|css|js|woff2?)$/i.test(le) && le.indexOf('example@') !== 0) emailSet.add(le); }\n  // phones\n  const tels = html.match(/tel:([+0-9()\\-.\\s]{6,})/gi) || [];\n  for (const t of tels) { const p = t.replace(/tel:/i, '').trim(); if (p) phoneSet.add(p); }\n  // social links from href attributes (raw HTML)\n  const hrefs = html.match(/href=\\\"([^\\\"]+)\\\"/gi) || [];\n  for (const h of hrefs) { let link = h.replace(/^href=\\\"/i, '').replace(/\\\"$/, ''); addSocial(link); }\n  // social links anywhere in the text (covers reader markdown/plain + inline scripts)\n  const urlRe = /https?:\\/\\/(?:www\\.)?(?:facebook|instagram|linkedin|twitter|x|youtube|tiktok)\\.com\\/[A-Za-z0-9_@.\\-\\/]+/gi;\n  const urls = html.match(urlRe) || [];\n  for (const link of urls) addSocial(link);\n}\n\n// --- Filter out website-builder / platform / vendor emails ---\nconst vendor = ['remedoapp.com','remedo.io','wixpress.com','wix.com','sentry.io','sentry-cdn.com','squarespace.com','godaddy.com','secureserver.net','wordpress.com','automattic.com','shopify.com','myshopify.com','hubspot.com','mailchimp.com','list-manage.com','cloudflare.com','w3.org','schema.org','googleapis.com','gstatic.com','example.com','domain.com','email.com','yourdomain.com','test.com','yoast.com','jina.ai'];\nconst real = [];\nconst dropped = [];\nfor (const e of Array.from(emailSet)) { const dom = (e.split('@')[1] || ''); if (vendor.some(v => dom === v || dom.endsWith('.' + v))) dropped.push(e); else real.push(e); }\nresult.emails = real.slice(0, 10);\n\n// --- MERGE phones: known Google phone first, then scraped ---\nconst mergedPhones = [];\nif (knownPhone) mergedPhones.push(knownPhone);\nfor (const p of Array.from(phoneSet)) { const digits = p.replace(/[^0-9]/g, ''); const knownDigits = knownPhone.replace(/[^0-9]/g, ''); if (knownDigits && digits && (digits.endsWith(knownDigits) || knownDigits.endsWith(digits))) continue; mergedPhones.push(p); }\nresult.phones = mergedPhones.slice(0, 5);\n\nfor (const k of Object.keys(sset)) { const arr = Array.from(sset[k]); if (arr.length) result.social[k] = arr.slice(0, 3); }\n\n// --- Note: explain per-channel what happened, never fail ---\nconst notes = [];\nif (!pageReadable) {\n  if (isChallenge) { notes.push('This website is protected by a strong bot-check (Cloudflare) or loads its content only with JavaScript, so its on-site emails and social links could not be read even with the free reader. Details below are from the Google listing.'); }\n  else { notes.push('The website could not be read (it may be down or blocking bots). Contact info below is from the Google listing only.'); }\n}\nif (result.emails.length === 0) { if (dropped.length) notes.push('No real business email found on the site (only website-builder/platform emails, which were hidden). Reach them by phone or their contact page.'); else notes.push('No public email is listed on this website. Use the phone number or their contact page instead.'); }\nif (result.phones.length === 0) notes.push('No phone number found on Google or the website.');\nif (Object.keys(result.social).length === 0) notes.push('No social media links found on this page.');\nresult.note = notes.join(' ');\n\nreturn [{ json: result }];"
+      },
+      "id": "860373ea-e8fe-4f05-8d02-e6b774425b91",
+      "name": "Extract Contacts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r0",
+              "name": "name",
+              "value": "={{ $json.name }}",
+              "type": "string"
+            },
+            {
+              "id": "r1",
+              "name": "url",
+              "value": "={{ $json.url }}",
+              "type": "string"
+            },
+            {
+              "id": "r2",
+              "name": "emails",
+              "value": "={{ $json.emails.join(\", \") }}",
+              "type": "string"
+            },
+            {
+              "id": "r3",
+              "name": "phones",
+              "value": "={{ $json.phones.join(\", \") }}",
+              "type": "string"
+            },
+            {
+              "id": "r3b",
+              "name": "address",
+              "value": "={{ $json.address }}",
+              "type": "string"
+            },
+            {
+              "id": "r3c",
+              "name": "hours",
+              "value": "={{ $json.hours }}",
+              "type": "string"
+            },
+            {
+              "id": "r3d",
+              "name": "rating",
+              "value": "={{ $json.rating }}",
+              "type": "string"
+            },
+            {
+              "id": "r3e",
+              "name": "google_maps",
+              "value": "={{ $json.maps }}",
+              "type": "string"
+            },
+            {
+              "id": "r4",
+              "name": "facebook",
+              "value": "={{ ($json.social.facebook || []).join(\", \") }}",
+              "type": "string"
+            },
+            {
+              "id": "r5",
+              "name": "instagram",
+              "value": "={{ ($json.social.instagram || []).join(\", \") }}",
+              "type": "string"
+            },
+            {
+              "id": "r6",
+              "name": "linkedin",
+              "value": "={{ ($json.social.linkedin || []).join(\", \") }}",
+              "type": "string"
+            },
+            {
+              "id": "r7",
+              "name": "twitter",
+              "value": "={{ ($json.social.twitter || []).join(\", \") }}",
+              "type": "string"
+            },
+            {
+              "id": "r8",
+              "name": "youtube",
+              "value": "={{ ($json.social.youtube || []).join(\", \") }}",
+              "type": "string"
+            },
+            {
+              "id": "r9",
+              "name": "tiktok",
+              "value": "={{ ($json.social.tiktok || []).join(\", \") }}",
+              "type": "string"
+            },
+            {
+              "id": "r10",
+              "name": "note",
+              "value": "={{ $json.note }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "61d0cc76-043a-445b-abd5-ffe1fa186533",
+      "name": "Respond",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1120,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Fetch Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Page": {
+      "main": [
+        [
+          {
+            "node": "Fetch Rendered",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Rendered": {
+      "main": [
+        [
+          {
+            "node": "Fetch via Reader",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch via Reader": {
+      "main": [
+        [
+          {
+            "node": "Extract Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Contacts": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "errorWorkflow": "ewa56KIP8xaFiHTG"
+  },
+  "versionId": "79a0bad8-b214-430e-96fe-5755d1fe7d25",
+  "meta": {
+    "instanceId": "bbe63525abda93c4dffbb2bab32ee46dd97dc7395c0c926270cce113ce106012"
+  },
+  "nodeGroups": [],
+  "id": "BO3h0M3ZuLczMqxx",
+  "tags": []
+}

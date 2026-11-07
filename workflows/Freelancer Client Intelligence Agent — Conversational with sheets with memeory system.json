@@ -1,0 +1,982 @@
+{
+  "name": "Freelancer Client Intelligence Agent — Conversational with sheets with memeory system",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "0910115a-e660-40ce-9305-4ea0a47b9b7d",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        -48,
+        112
+      ],
+      "webhookId": "7fa616d5-958c-451e-9480-7c8c62ace96b",
+      "credentials": {
+        "telegramApi": {
+          "id": "OwmkcNk2GUkjBq16",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "CkGiazgYZOGcnklc",
+          "cachedResultName": "user_profile"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "chat_id",
+              "keyValue": "={{ $json.message.chat.id }}"
+            }
+          ]
+        }
+      },
+      "id": "2b5e9391-276d-43c4-9272-1b91a9a4cc00",
+      "name": "Get Profile",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        288,
+        112
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=== FREELANCER PROFILE (yours; use it to tailor everything) ===\nYour name: {{ $json.full_name }}\nPhone (optional): {{ $json.phone }}\nPortfolio (optional): {{ $json.portfolio }}\nProfession: {{ $json.profession }}\nServices: {{ $json.services }}\nUSP: {{ $json.usp }}\nIdeal client: {{ $json.ideal_client }}\nVoice/tone: {{ $json.voice }}\nExtra notes: {{ $json.extra_notes }}\n=== END PROFILE (if Your name AND Profession are blank, the profile is NOT set up yet) ===\n\nUSER MESSAGE:\n{{ $(\"Telegram Trigger\").item.json.message.text }}",
+        "options": {
+          "systemMessage": "You are a friendly client-intelligence assistant for a freelancer on Telegram. The freelancer's profile (profession, services, USP, ideal client, voice) is at the top of every message. Use it to personalize everything. Talk naturally; keep replies concise, plain text, no markdown tables.\n\nONBOARDING: If Profession is blank, the profile isn't set up. Warmly offer to set it up (ask profession, services, USP, ideal client, tone) and call save_profile with their answers.\n\nPROFILE CHANGES: Understand what the user means in natural language — they can phrase a change any way (\"switch my niche to dentists\", \"I do web design now\", \"redo my whole profile\", \"actually make my tone casual\"). Figure out which fields they want changed. If the profile is blank (first-time setup), just save what they give. If a profile already exists and they clearly want to change it, briefly confirm before overwriting so they don't lose data by accident — for a small tweak a one-line \"Change your ideal client to dentists? Reply yes\" is enough; for a big/whole-profile change, recap the new values back and ask them to confirm. Once they agree (in any wording — yes/yep/go ahead/that's right), call save_profile with the fields they gave; fields they didn't mention keep their old values. Don't be robotic or demand exact words — just make sure a real overwrite is intentional, then do it. If a message is only a search or question (not a profile change), don't touch the profile.\n\nNAME & SIGNATURE (STRICT):\n- \"Your name\" at the top of the profile is the freelancer's real name.\n- EVERY time you draft an email/outreach body, you MUST end it with exactly:\nBest regards,\n<Your name>\n- By DEFAULT sign with the NAME ONLY. Do NOT put the phone number or portfolio link in the email.\n- ONLY add the phone line if the user explicitly asks in THIS request (e.g. \"add my phone\", \"include my number\").\n- ONLY add the portfolio line if the user explicitly asks in THIS request (e.g. \"add my portfolio\", \"include my website\").\n- If they ask for one but not the other, add only the one they asked for.\n- Never invent a phone or portfolio — use only the values from the profile. If \"Your name\" is blank, ask for it before drafting any email.\n\nPROFILE TRUTH: The profile block in the CURRENT message is the truth. If Profession is filled, the profile IS set up — never say it's missing or re-onboard, even if earlier messages said so. On \"hi\" when set up, just greet by name and offer to help.\n\nONBOARDING NAME: When setting up or changing the profile, always capture the freelancer's full name (required) and pass it as full_name to save_profile. Phone and portfolio are optional — offer them, don't insist; pass them as phone / portfolio only if given.\n\nTOOLS:\n- save_profile: save/update the freelancer's OWN business profile (not a lead).\n- find_leads: DISCOVER new client businesses by niche+location (e.g. \"gyms in Dubai\"). The ONLY source of a business's name, website, phone, rating, address.\n- fetch_website: READ one company site (needs a full https:// URL).\n- find_contact: SCRAPE one URL for emails, phones, social links.\n- save_lead: save a prospect to the pipeline.\n- send_email: send outreach — always asks the freelancer to Approve in Telegram first; never emails without approval.\n- update_lead_status: stop/resume follow-ups for a lead. Map words to status: already talked/replied/on hold=>nurture; signed/won=>won; not interested=>lost; unreachable=>dead; resume=>active.\n\nCHOOSING A TOOL:\n- \"find/prospect clients\" + niche/place => find_leads.\n- \"research/look into/dig into\" a business => the FULL DEEP-DIVE (see below).\n- \"get their contact/email\" => find_contact.\n- \"save them\" => save_lead. \"send it\" => send_email (draft in their voice first).\n\nRESEARCH = FULL DEEP-DIVE (never make them ask piece by piece): For each business, in one turn: (1) get its exact Website from find_leads if you don't already have it — never guess a domain; (2) fetch_website to summarize what they do + outreach observations; (3) find_contact on that exact URL (if empty, try +/contact then +/about) to collect every email, phone, and social link. Then give ONE combined profile: what they do, Email(s), Social links, Phone, plus Address/Rating/Hours/Maps link.\n\nMERGE IS AUTOMATIC: When you call find_contact, ALSO pass the phone, address, hours, rating and maps link you already have for that business from the find_leads search (as known_phone, known_address, etc.). The tool merges them and returns the COMPLETE profile — phone, address, hours, rating, maps, emails, socials — plus a note explaining any channel it couldn't find. Just relay every non-empty field the tool returns; trust its note for what's missing. Do NOT second-guess it, drop fields, or say \"no phone\" when the tool returned a phone.\n\n\"THE FIRST ONE\"/\"THAT ONE\"/\"#3\"/a name you already listed (CRITICAL): Use that EXACT business + its EXACT Website from your MOST RECENT find_leads list, and run the deep-dive on it. Do NOT call find_leads again for these — re-searching returns a different list and is a bug. Only call find_leads for a genuinely NEW search (new niche/location). If you truly don't have the earlier list, ask \"Which business, or paste its website?\" — don't invent one.\n\nMULTIPLE BUSINESSES: Deep-dive each. Put a line with exactly ---SPLIT--- BETWEEN each business's block (not before the first/after the last); each block becomes its own Telegram message, so start each with the business name. For more than 5 at once, do 5 and offer to continue. No ---SPLIT--- for a single business.\n\nDISPLAY after a search: for each business show every field the tool returned, one per line: Name, Category, Rating+reviews, Website, Phone, Address, Opening hours (regularOpeningHours from the tool — these are the hours listed on the business's Google profile; list the weekday hours; if the tool didn't return hours, write \"Hours: not listed\"), Google Maps link, and a Fit score 0-100 with reason (when profile is set; sort best-fit first). Missing field => \"—\".\n\nFIT vs PROFILE (IMPORTANT — proactively guide them): The freelancer's ideal_client is in the profile. If the niche they searched clearly does NOT match their ideal_client (e.g. profile says \"marketing agencies\" but they searched dentists), gently flag it up front in ONE short line, e.g. \"Heads up — you usually target marketing agencies, so dentists may be off your usual fit. Still happy to dig in if you want.\" Don't refuse — just make them aware, then proceed. When the niche DOES match their ideal_client, say so briefly and positively.\n\nAFTER showing results or a research profile, ALWAYS end by proactively offering the obvious next steps in one short line — e.g. \"Want me to research any of these, find their contact details, or save one to your pipeline?\" After a deep-dive on a single business, always offer to save it to the pipeline and/or draft outreach. Never make the user think to ask — suggest it.\n\nGROUNDING (ABSOLUTE — most important): You have NO reliable built-in knowledge of any business. Every fact (address, phone, hours, what they do, emails, socials) MUST come from a tool result in THIS chat. Never state or guess a fact from memory. The URL you pass to find_contact must be copy-pasted CHARACTER-FOR-CHARACTER from the Website find_leads returned — never build a domain from the business name. Only show an email/social/phone/link that literally appeared in a tool result for THAT EXACT business in THIS request — never reuse one from an earlier business or search. If a channel wasn't found, say \"No public email found\" / \"No social links found\" — don't fill the gap. If the user challenges a fact, re-run the tool; if you can't verify, say so plainly. Never fabricate.",
+          "enableStreaming": false
+        }
+      },
+      "id": "6b531419-8452-44a0-aa9a-de4c24752dc1",
+      "name": "Assistant",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        896,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.4
+        }
+      },
+      "id": "51a70840-d50d-4464-98cc-168a6dfef927",
+      "name": "OpenAI Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        448,
+        336
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "n8n credits",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $(\"Telegram Trigger\").item.json.message.chat.id }}-oai",
+        "contextWindowLength": 10
+      },
+      "id": "84b68537-aff9-4832-82ba-9f16ee359030",
+      "name": "Conversation Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        576,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Save or update the freelancer's OWN business profile (not a lead). Use this during onboarding or whenever the user tells you about their own business, or asks to change their profile. Pass whatever fields they gave; leave the rest empty and it keeps prior values. Always include chat_id.",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L2gE83ymYDTK9HFR",
+          "cachedResultName": "Freelancer Agent — Save Profile (tool)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chat_id": "={{ $(\"Telegram Trigger\").first().json.message.chat.id }}",
+            "profession": "={{ $fromAI('profession', 'the freelancer profession, e.g. graphic designer, web developer, copywriter', 'string') }}",
+            "services": "={{ $fromAI('services', 'their main services offered', 'string') }}",
+            "usp": "={{ $fromAI('usp', 'what makes them different / their unique selling point', 'string') }}",
+            "ideal_client": "={{ $fromAI('ideal_client', 'the kind of client they want, e.g. local restaurants, SaaS startups', 'string') }}",
+            "voice": "={{ $fromAI('voice', 'their preferred tone/voice for outreach, e.g. friendly and casual, formal and professional', 'string') }}",
+            "extra_notes": "={{ $fromAI('extra_notes', 'any extra info about their business', 'string') }}",
+            "full_name": "={{ $fromAI('full_name') }}",
+            "phone": "={{ $fromAI('phone') }}",
+            "portfolio": "={{ $fromAI('portfolio') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "profession",
+              "displayName": "profession",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "services",
+              "displayName": "services",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "usp",
+              "displayName": "usp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "ideal_client",
+              "displayName": "ideal_client",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "voice",
+              "displayName": "voice",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "extra_notes",
+              "displayName": "extra_notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "full_name",
+              "displayName": "full_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "portfolio",
+              "displayName": "portfolio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "3d06aad6-a14e-450e-abb6-b043a44b4a8f",
+      "name": "save_profile",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        704,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "PRIMARY lead-discovery tool. Discover NEW potential client businesses by niche and location using Google Places. Input: a text query like \"dentists in Austin\" or \"plumbers in Manchester\". Returns business names, websites, phone numbers, addresses and ratings. Use this first whenever the user wants to find/prospect clients.",
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.websiteUri,places.nationalPhoneNumber,places.rating,places.userRatingCount,places.primaryTypeDisplayName,places.googleMapsUri,places.regularOpeningHours,places.businessStatus"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"textQuery\": \"{{ $fromAI('search_query', 'the niche and location to search, e.g. dentists in Austin') }}\",\n  \"pageSize\": 6\n}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "ff9f4ff3-aa22-441b-a5a9-4aa4d3446434",
+      "name": "find_leads",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.5,
+      "position": [
+        832,
+        336
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "mG9F7EFyQFrXYrmr",
+          "name": "google maps api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Fetch the visible text content of a company website homepage. Use this for company research, website audits and to personalize outreach drafts. Input: the full URL including https://. If the returned content is very thin, the site is likely JavaScript-rendered — say so and do not invent details.",
+        "url": "={{ $fromAI('url', 'full website URL including https://') }}",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 5
+            }
+          },
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 15000
+        },
+        "optimizeResponse": true,
+        "responseType": "html",
+        "onlyContent": true,
+        "truncateResponse": true,
+        "maxLength": 3000
+      },
+      "id": "c4fadb7e-5066-4e44-86c8-987b0dd378ba",
+      "name": "fetch_website",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Get the FULL contact profile for ONE business. Pass the business website URL PLUS everything you already know about it from the find_leads search (name, phone, address, hours, rating, google maps link). This tool scrapes the website for emails and social links AND automatically merges in the phone/address/hours/rating/maps you passed — so the result it returns is the COMPLETE profile. Just relay every non-empty field it returns. It handles \"not found\" per channel with a clear note; never invent or reuse data from a different business.",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "BO3h0M3ZuLczMqxx",
+          "cachedResultName": "Freelancer Agent — Scrape Contact (tool)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "url": "={{ $fromAI('url', 'full website URL of the business including https://, copied exactly from the search Website field', 'string') }}",
+            "name": "={{ $fromAI('name', 'the business name', 'string') }}",
+            "known_phone": "={{ $fromAI('known_phone', 'the phone number from the search result for this business, if any', 'string') }}",
+            "known_address": "={{ $fromAI('known_address', 'the address from the search result for this business, if any', 'string') }}",
+            "known_hours": "={{ $fromAI('known_hours', 'the opening hours from the search result for this business, if any', 'string') }}",
+            "known_rating": "={{ $fromAI('known_rating', 'the rating and review count from the search result, if any', 'string') }}",
+            "known_maps": "={{ $fromAI('known_maps', 'the google maps link from the search result, if any', 'string') }}"
+          },
+          "schema": [
+            {
+              "id": "url",
+              "displayName": "url",
+              "type": "string",
+              "required": true,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "known_phone",
+              "displayName": "known_phone",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "known_address",
+              "displayName": "known_address",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "known_hours",
+              "displayName": "known_hours",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "known_rating",
+              "displayName": "known_rating",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "known_maps",
+              "displayName": "known_maps",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "matchingColumns": []
+        }
+      },
+      "id": "8a13ef4a-0aa6-4d2c-869a-6c63d7e43720",
+      "name": "find_contact",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1088,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Save a prospect/lead to the freelancer pipeline and start follow-up reminders. Provide as many fields as you know; leave unknown fields empty. Always include chat_id.",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "ijAiFInAUIdPQYhs",
+          "cachedResultName": "Freelancer Agent — Save Lead (tool)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "contact_name": "={{ $fromAI('contact_name', 'person name if known', 'string') }}",
+            "company": "={{ $fromAI('company', 'company name', 'string') }}",
+            "domain": "={{ $fromAI('domain', 'website domain if known', 'string') }}",
+            "contact_email": "={{ $fromAI('contact_email', 'email if known', 'string') }}",
+            "linkedin_url": "={{ $fromAI('linkedin_url', 'linkedin url if known', 'string') }}",
+            "notes": "={{ $fromAI('notes', 'any useful notes about this lead', 'string') }}",
+            "chat_id": "={{ $(\"Telegram Trigger\").first().json.message.chat.id }}"
+          },
+          "schema": [
+            {
+              "id": "contact_name",
+              "displayName": "contact_name",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "company",
+              "displayName": "company",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "domain",
+              "displayName": "domain",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "contact_email",
+              "displayName": "contact_email",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "linkedin_url",
+              "displayName": "linkedin_url",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "matchingColumns": []
+        }
+      },
+      "id": "df3c4677-add2-43c2-a4c2-42a7e8b11f22",
+      "name": "save_lead",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1216,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Send an outreach email to a client — but ONLY after the freelancer approves. This tool sends the draft to the freelancer in Telegram with Approve/Cancel buttons and waits; it emails the client only if they tap Approve. Use this whenever the user wants to actually SEND an email. Always pass the full recipient, subject and body you have drafted, plus chat_id.",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "oovs2DrfqRlH2dLS",
+          "cachedResultName": "Freelancer Agent — Send Email with Approval (tool)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "to": "={{ $fromAI('to', 'recipient email address', 'string') }}",
+            "subject": "={{ $fromAI('subject', 'email subject line', 'string') }}",
+            "body": "={{ $fromAI('body', 'the full email body text', 'string') }}",
+            "chat_id": "={{ $(\"Telegram Trigger\").first().json.message.chat.id }}"
+          },
+          "schema": [
+            {
+              "id": "to",
+              "displayName": "to",
+              "type": "string",
+              "required": true,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "type": "string",
+              "required": true,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "body",
+              "displayName": "body",
+              "type": "string",
+              "required": true,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "matchingColumns": []
+        }
+      },
+      "id": "78ee72bc-ca5f-4a70-8a2d-783214ec32e8",
+      "name": "send_email",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1344,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Change a saved lead's status in the pipeline — use this to STOP or resume automatic follow-up reminders for a lead the freelancer already contacted. Identify the lead by company name (preferred) or domain. Set status to one of: \"nurture\" (already talked / replied / on hold — stops the chasing follow-ups), \"won\" (became a client — stops follow-ups), \"lost\" (not interested — stops follow-ups), \"dead\" (unreachable — stops follow-ups), or \"active\" (resume follow-ups). Use whenever the user says things like \"I already talked to X\", \"X replied\", \"X signed\", \"X is not interested\", or \"stop following up X\".",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PwDiTU3hjhmXugv3",
+          "cachedResultName": "Freelancer Agent — Update Lead Status (tool)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "company": "={{ $fromAI('company', 'the company name of the lead to update', 'string') }}",
+            "domain": "={{ $fromAI('domain', 'the website domain of the lead, if known', 'string') }}",
+            "status": "={{ $fromAI('status', 'what happened with the lead, e.g. already talked, won, not interested, dead, or resume', 'string') }}"
+          },
+          "schema": [
+            {
+              "id": "company",
+              "displayName": "company",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "domain",
+              "displayName": "domain",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "type": "string",
+              "required": true,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "matchingColumns": []
+        }
+      },
+      "id": "31a24c97-6c7a-4060-b727-59a0b87587fa",
+      "name": "update_lead_status",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1472,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Split the agent's reply into separate Telegram messages.\n// The agent inserts a line containing exactly ---SPLIT--- between businesses.\n// Also chunk any single block that exceeds Telegram's ~4096 char limit.\nconst raw = ($json.output || '').toString();\nconst parts = raw.includes('---SPLIT---') ? raw.split('---SPLIT---') : [raw];\nconst chunks = [];\nconst LIMIT = 3800;\nfor (const part of parts) {\n  let t = part.trim();\n  if (!t) continue;\n  while (t.length > LIMIT) {\n    let cut = t.lastIndexOf('\\n', LIMIT);\n    if (cut < 1000) cut = LIMIT;\n    chunks.push(t.slice(0, cut).trim());\n    t = t.slice(cut).trim();\n  }\n  if (t) chunks.push(t);\n}\nif (chunks.length === 0) chunks.push('(no reply)');\nreturn chunks.map(c => ({ json: { output: c } }));"
+      },
+      "id": "9ec9676e-9ae3-4b4d-9edf-17dc6fb86850",
+      "name": "Split Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $(\"Telegram Trigger\").first().json.message.chat.id }}",
+        "text": "={{ $json.output.toString().replaceAll(\"&\", \"&amp;\").replaceAll(\"<\", \"&lt;\").replaceAll(\">\", \"&gt;\").replaceAll(\"**\", \"\") }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "4a2f51ee-37c8-4003-9ad8-9f9844a5db15",
+      "name": "Send Reply",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1904,
+        112
+      ],
+      "webhookId": "25696bf1-a529-42dd-9556-a63bcc76336e",
+      "credentials": {
+        "telegramApi": {
+          "id": "OwmkcNk2GUkjBq16",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1e741340-37f1-456d-aa58-c90ead02fe1a",
+              "leftValue": "={{ ($json.message.text || '').toLowerCase().trim() }}",
+              "rightValue": "=start over",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "10bb5136-88b3-4236-9c20-524daec64018",
+              "leftValue": "startover",
+              "rightValue": "={{ ($json.message.text || '').toLowerCase().trim() }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "399021dd-fd0e-452e-92c2-af0c34944326",
+              "leftValue": "/start over",
+              "rightValue": "={{ ($json.message.text || '').toLowerCase().trim() }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "b7a72430-f652-4d73-b425-af998b4e901b",
+              "leftValue": "start over",
+              "rightValue": "={{ ($json.message.text || '').toLowerCase().trim() }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "b56100ec-b7e7-4909-bf8d-c2579af1c7e3",
+              "leftValue": "/startover",
+              "rightValue": "={{ ($json.message.text || '').toLowerCase().trim() }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        112,
+        -16
+      ],
+      "id": "eb67c00f-bc72-46cb-9fa8-48017dfc2832",
+      "name": "start over"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $(\"Telegram Trigger\").first().json.message.chat.id }}",
+        "text": "Done — fresh start! Your profile is safe; I've only cleared our recent conversation. How can I help?",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        752,
+        -80
+      ],
+      "id": "5f915555-91c8-41fe-945c-3ff6521d646f",
+      "name": "Send Reset Confirm",
+      "webhookId": "c74d0457-2c50-47da-9d41-e9ca9f9d24af",
+      "credentials": {
+        "telegramApi": {
+          "id": "OwmkcNk2GUkjBq16",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "delete",
+        "deleteMode": "all"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryManager",
+      "typeVersion": 1.1,
+      "position": [
+        384,
+        -80
+      ],
+      "id": "54a0e30c-6979-4bd2-97fc-dcc2e6c4cfd3",
+      "name": "Clear Memory"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "start over",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Profile": {
+      "main": [
+        [
+          {
+            "node": "Assistant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assistant": {
+      "main": [
+        [
+          {
+            "node": "Split Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Assistant",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conversation Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Assistant",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "Clear Memory",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "save_profile": {
+      "ai_tool": [
+        [
+          {
+            "node": "Assistant",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "find_leads": {
+      "ai_tool": [
+        [
+          {
+            "node": "Assistant",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch_website": {
+      "ai_tool": [
+        [
+          {
+            "node": "Assistant",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "find_contact": {
+      "ai_tool": [
+        [
+          {
+            "node": "Assistant",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "save_lead": {
+      "ai_tool": [
+        [
+          {
+            "node": "Assistant",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send_email": {
+      "ai_tool": [
+        [
+          {
+            "node": "Assistant",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update_lead_status": {
+      "ai_tool": [
+        [
+          {
+            "node": "Assistant",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Reply": {
+      "main": [
+        [
+          {
+            "node": "Send Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "start over": {
+      "main": [
+        [
+          {
+            "node": "Clear Memory",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Reset Confirm": {
+      "main": [
+        []
+      ]
+    },
+    "Clear Memory": {
+      "main": [
+        [
+          {
+            "node": "Send Reset Confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "errorWorkflow": "ewa56KIP8xaFiHTG"
+  },
+  "versionId": "0eca014a-0e2a-4258-a9d7-2d63150cd7eb",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "bbe63525abda93c4dffbb2bab32ee46dd97dc7395c0c926270cce113ce106012"
+  },
+  "nodeGroups": [],
+  "id": "XEZR9lKWJznWh39U",
+  "tags": []
+}

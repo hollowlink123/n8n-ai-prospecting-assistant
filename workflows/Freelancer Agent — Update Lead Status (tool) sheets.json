@@ -1,0 +1,307 @@
+{
+  "name": "Freelancer Agent — Update Lead Status (tool) sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "company"
+            },
+            {
+              "name": "domain"
+            },
+            {
+              "name": "status"
+            }
+          ]
+        }
+      },
+      "id": "27197d57-e081-4f39-a4a4-684a6b332f20",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nconst company = (r.company || '').trim();\nconst domain = (r.domain || '').trim();\nlet s = (r.status || '').toLowerCase().trim();\nlet status;\nif (/(won|signed|hired|closed|client now|deal)/.test(s)) status = 'won';\nelse if (/(lost|not interested|no|reject|declin|pass)/.test(s)) status = 'lost';\nelse if (/(dead|bounced|invalid|unreachable)/.test(s)) status = 'dead';\nelse if (/(talk|conversation|replied|responded|contacted|discuss|nurtur|hold|paus|wait)/.test(s)) status = 'nurture';\nelse if (/(new|active|open|prospect)/.test(s)) status = 'active';\nelse status = s || 'nurture';\nreturn [{ json: { company, domain, status } }];"
+      },
+      "id": "3c392969-6fea-41cc-93c0-ca63ae7431af",
+      "name": "Normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1AslH2SfF8ykqu-GWRlAs27WXd_jM4LgMl5cH7Bki8-s",
+          "mode": "list",
+          "cachedResultName": "freelnc",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1AslH2SfF8ykqu-GWRlAs27WXd_jM4LgMl5cH7Bki8-s/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "prospects"
+        },
+        "options": {}
+      },
+      "id": "a389fe7e-b348-4026-954a-b4d01677489a",
+      "name": "Read Rows",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctl = $('Normalize').first().json;\nconst company = (ctl.company || '').toLowerCase().trim();\nconst domain = (ctl.domain || '').toLowerCase().replace(/^https?:\\/\\//,'').replace(/\\/$/,'').trim();\nconst rows = $input.all().map(i => i.json).filter(r => r && Object.keys(r).length > 0);\nlet hit = null;\nfor (const r of rows) {\n  const c = String(r.company || '').toLowerCase().trim();\n  const d = String(r.domain || '').toLowerCase().replace(/^https?:\\/\\//,'').replace(/\\/$/,'').trim();\n  if (company && c === company) { hit = r; break; }\n  if (domain && d && d === domain) { hit = r; break; }\n}\nconst target = ctl.company || ctl.domain;\nif (!hit) {\n  return [{ json: { found: false, target, status: ctl.status } }];\n}\nreturn [{ json: { found: true, lead_id: hit.lead_id, company: hit.company, target, status: ctl.status } }];"
+      },
+      "id": "566c2568-0810-4905-8242-68d94f1f8d23",
+      "name": "Find Match",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f",
+              "leftValue": "={{ $json.found }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "15e723a0-f6b6-4b7b-9701-50b10e76dfe9",
+      "name": "Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        896,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1AslH2SfF8ykqu-GWRlAs27WXd_jM4LgMl5cH7Bki8-s",
+          "mode": "list",
+          "cachedResultName": "freelnc",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1AslH2SfF8ykqu-GWRlAs27WXd_jM4LgMl5cH7Bki8-s/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "prospects"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "lead_id"
+          ],
+          "value": {
+            "lead_id": "={{ $json.lead_id }}",
+            "status": "={{ $json.status }}"
+          },
+          "schema": [
+            {
+              "id": "lead_id",
+              "displayName": "lead_id",
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9d192544-47b2-43f9-b98d-9a958b463d30",
+      "name": "Update Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1120,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "result",
+              "name": "result",
+              "type": "string",
+              "value": "=Updated {{ $(\"Find Match\").first().json.target }} to status \"{{ $(\"Find Match\").first().json.status }}\". Follow-ups for this lead are now {{ [\"won\",\"lost\",\"dead\",\"nurture\"].includes($(\"Find Match\").first().json.status) ? \"stopped\" : \"active\" }}."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b99584ae-dae1-4854-aa80-6d136dd53431",
+      "name": "Result Found",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1344,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "result",
+              "name": "result",
+              "type": "string",
+              "value": "=Could not find a saved lead matching \"{{ $(\"Find Match\").first().json.target }}\". Make sure it was saved to the pipeline first."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "60b93592-1e78-4d5e-9b3d-935ff56ff73d",
+      "name": "Result Missing",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1120,
+        96
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize": {
+      "main": [
+        [
+          {
+            "node": "Read Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Rows": {
+      "main": [
+        [
+          {
+            "node": "Find Match",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Match": {
+      "main": [
+        [
+          {
+            "node": "Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Found?": {
+      "main": [
+        [
+          {
+            "node": "Update Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Result Missing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Row": {
+      "main": [
+        [
+          {
+            "node": "Result Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "errorWorkflow": "ewa56KIP8xaFiHTG"
+  },
+  "versionId": "641be595-3ecf-48bc-b439-f020c36c84c0",
+  "meta": {
+    "instanceId": "bbe63525abda93c4dffbb2bab32ee46dd97dc7395c0c926270cce113ce106012"
+  },
+  "nodeGroups": [],
+  "id": "PwDiTU3hjhmXugv3",
+  "tags": []
+}

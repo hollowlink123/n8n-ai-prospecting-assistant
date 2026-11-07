@@ -1,0 +1,320 @@
+{
+  "name": "Freelancer Agent — Save Lead (tool) with sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "contact_name"
+            },
+            {
+              "name": "company"
+            },
+            {
+              "name": "domain"
+            },
+            {
+              "name": "contact_email"
+            },
+            {
+              "name": "linkedin_url"
+            },
+            {
+              "name": "notes"
+            },
+            {
+              "name": "chat_id"
+            }
+          ]
+        }
+      },
+      "id": "8627e7f8-847c-4f68-b43a-982efa72f9c9",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $input.first().json || {};\nconst leadId = Date.now().toString(36) + '-' + Math.floor(Math.random() * 1e6).toString(36);\nreturn [{ json: {\n  lead_id: leadId,\n  contact_name: j.contact_name || '',\n  company: j.company || '',\n  domain: j.domain || '',\n  contact_email: j.contact_email || '',\n  linkedin_url: j.linkedin_url || '',\n  notes: j.notes || '',\n  research_brief: '',\n  status: 'new',\n  followup_stage: 0,\n  next_followup_at: $now.plus({ days: 3 }).toISO(),\n  last_contacted_at: '',\n  call_at: '',\n  call_prep_sent: '',\n  created_at: $now.toISO(),\n  chat_id: String(j.chat_id || ''),\n  savedName: j.company || j.contact_name || 'lead',\n} }];"
+      },
+      "id": "98e331c1-2ab8-4810-8f28-7488a585effa",
+      "name": "Build Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1AslH2SfF8ykqu-GWRlAs27WXd_jM4LgMl5cH7Bki8-s",
+          "mode": "list",
+          "cachedResultName": "freelnc",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1AslH2SfF8ykqu-GWRlAs27WXd_jM4LgMl5cH7Bki8-s/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "prospects"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "lead_id": "={{ $json.lead_id }}",
+            "contact_name": "={{ $json.contact_name }}",
+            "company": "={{ $json.company }}",
+            "domain": "={{ $json.domain }}",
+            "contact_email": "={{ $json.contact_email }}",
+            "linkedin_url": "={{ $json.linkedin_url }}",
+            "status": "={{ $json.status }}",
+            "notes": "={{ $json.notes }}",
+            "research_brief": "={{ $json.research_brief }}",
+            "followup_stage": "={{ $json.followup_stage }}",
+            "next_followup_at": "={{ $json.next_followup_at }}",
+            "last_contacted_at": "={{ $json.last_contacted_at }}",
+            "call_at": "={{ $json.call_at }}",
+            "call_prep_sent": "={{ $json.call_prep_sent }}",
+            "chat_id": "={{ $json.chat_id }}",
+            "created_at": "={{ $json.created_at }}"
+          },
+          "schema": [
+            {
+              "id": "lead_id",
+              "displayName": "lead_id",
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "contact_name",
+              "displayName": "contact_name",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "company",
+              "displayName": "company",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "domain",
+              "displayName": "domain",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "contact_email",
+              "displayName": "contact_email",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "linkedin_url",
+              "displayName": "linkedin_url",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "research_brief",
+              "displayName": "research_brief",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "followup_stage",
+              "displayName": "followup_stage",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "next_followup_at",
+              "displayName": "next_followup_at",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "last_contacted_at",
+              "displayName": "last_contacted_at",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "call_at",
+              "displayName": "call_at",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "call_prep_sent",
+              "displayName": "call_prep_sent",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "eb4fb2f9-06f9-44bb-8361-65de2514e21a",
+      "name": "Insert Prospect",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "result",
+              "value": "=Saved \"{{ $(\"Build Row\").first().json.savedName }}\" to the pipeline. First follow-up scheduled in 3 days.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2ab0a5e7-b69d-448f-90aa-d2adf1cdf482",
+      "name": "Respond",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Build Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Row": {
+      "main": [
+        [
+          {
+            "node": "Insert Prospect",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Prospect": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "errorWorkflow": "ewa56KIP8xaFiHTG"
+  },
+  "versionId": "ee8217d8-d5b7-4670-a83e-82fcdddf7155",
+  "meta": {
+    "instanceId": "bbe63525abda93c4dffbb2bab32ee46dd97dc7395c0c926270cce113ce106012"
+  },
+  "nodeGroups": [],
+  "id": "ijAiFInAUIdPQYhs",
+  "tags": []
+}

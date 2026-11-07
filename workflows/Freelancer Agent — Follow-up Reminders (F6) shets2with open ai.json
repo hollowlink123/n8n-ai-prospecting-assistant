@@ -1,0 +1,496 @@
+{
+  "name": "Freelancer Agent — Follow-up Reminders (F6) shets2with open ai",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "987d6bf0-ec98-429d-8a6c-5ceaa01b4888",
+      "name": "Daily 9am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1AslH2SfF8ykqu-GWRlAs27WXd_jM4LgMl5cH7Bki8-s",
+          "mode": "list",
+          "cachedResultName": "freelnc",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1AslH2SfF8ykqu-GWRlAs27WXd_jM4LgMl5cH7Bki8-s/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "prospects"
+        },
+        "options": {}
+      },
+      "id": "3947a45b-b39b-4707-9dc5-010aad1f0ecb",
+      "name": "Read Prospects",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        112
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// If a lead has no chat_id, reminders fall back to this chat. Put your own Telegram chat id here to catch those.\nconst DEFAULT_CHAT = '';\n\nconst rows = $input.all().map(i => i.json).filter(r => r && Object.keys(r).length > 0);\nconst terminal = ['won','lost','dead','nurture'];\nconst nowMs = $now.toMillis();\nconst out = [];\nfor (const r of rows) {\n  const status = (r.status || '').toLowerCase();\n  if (terminal.indexOf(status) !== -1) continue;\n\n  // due filter: next_followup_at <= now\n  const raw = r.next_followup_at;\n  if (!raw) continue;\n  const dueMs = new Date(raw).getTime();\n  if (isNaN(dueMs) || dueMs > nowMs) continue;\n\n  const stage = Number(r.followup_stage || 0);\n  let label, nextIso, newStatus = r.status || 'active';\n  if (stage <= 0) {\n    label = 'First follow-up — no reply yet';\n    nextIso = $now.plus({ days: 4 }).toISO();\n  } else if (stage === 1) {\n    label = 'Second follow-up — share a relevant case study';\n    nextIso = $now.plus({ days: 7 }).toISO();\n  } else {\n    label = 'Final follow-up — last touch before moving to nurture';\n    newStatus = 'nurture';\n    nextIso = $now.plus({ years: 10 }).toISO();\n  }\n\n  const chat = String(r.chat_id || DEFAULT_CHAT || '');\n  const email = r.contact_email || '';\n\n  out.push({ json: {\n    lead_id: r.lead_id,\n    contact_name: r.contact_name || '',\n    company: r.company || '',\n    domain: r.domain || '',\n    contact_email: email,\n    hasEmail: !!email,\n    notes: r.notes || '',\n    chat_id: chat,\n    hasChat: !!chat,\n    stage: stage,\n    stageLabel: label,\n    newStage: stage + 1,\n    newStatus: newStatus,\n    nextIso: nextIso,\n    lastContactedIso: $now.toISO(),\n  }});\n}\nreturn out;"
+      },
+      "id": "8229e942-e33c-40f1-9c90-c643acb5a397",
+      "name": "Prepare Reminders",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Write a short, friendly follow-up email for this prospect.\n\nContact: {{ $json.contact_name }}\nCompany: {{ $json.company }}\nDomain: {{ $json.domain }}\nFollow-up type: {{ $json.stageLabel }}\nStored notes about this prospect: {{ $json.notes }}",
+        "options": {
+          "systemMessage": "You draft brief, warm follow-up emails for a freelancer nudging a prospect who has not replied.\n\n>>> SETUP: Replace [YOUR NAME] everywhere below with your real name before using. <<<\n\nSTRICT GROUNDING:\n- Personalize ONLY from the stored notes and the follow-up type. Do NOT invent facts, metrics, prior conversations, or claims.\n- If you do not know something (a specific result number), leave a clearly [bracketed placeholder] — never fabricate.\n- NEVER include any links or URLs in the email: no markdown links like [text](url), no bare URLs, no email addresses. Refer to things in plain words only.\n- Match the tone to the follow-up type: first = gentle nudge; second = offer a case study; final = polite last touch mentioning you will stop reaching out.\n\nFORMAT (very important — output ONLY the email body, nothing else):\n- Do NOT include a \"Subject:\" line.\n- Line 1: a greeting, e.g. \"Hi there,\"\n- Then a blank line.\n- Then 1-2 short paragraphs (2-3 sentences total) with one soft call to action. Separate paragraphs with a blank line.\n- Then a blank line.\n- Then \"Best regards,\" on its own line.\n- Then \"[YOUR NAME]\" on the final line.\nKeep the whole email under ~700 characters. Always sign off exactly as \"[YOUR NAME]\".",
+          "enableStreaming": false
+        }
+      },
+      "id": "9d5b5bf9-3663-4a79-9905-fed6af890a37",
+      "name": "Draft Follow-up",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        672,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.5
+        }
+      },
+      "id": "5986ddfe-53be-4155-b467-843d2d072752",
+      "name": "OpenAI Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        752,
+        336
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "n8n credits",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "={{ $(\"Prepare Reminders\").item.json.chat_id }}",
+        "message": "=⏰ Follow-up due: {{ $(\"Prepare Reminders\").item.json.contact_name }} — {{ $(\"Prepare Reminders\").item.json.company }}\n{{ $(\"Prepare Reminders\").item.json.stageLabel }}\nTo: {{ $(\"Prepare Reminders\").item.json.contact_email }}\n\nDraft:\n{{ $json.output }}\n\nApprove to email this now, or skip.",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double",
+            "approveLabel": "✅ Send it",
+            "disapproveLabel": "❌ Skip"
+          }
+        },
+        "chatApproval": true,
+        "options": {
+          "limitWaitTime": {
+            "values": {
+              "resumeAmount": 24
+            }
+          },
+          "appendAttribution": false
+        }
+      },
+      "id": "e9364991-5336-4200-bc44-629146d9f92b",
+      "name": "Ask Approval",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1024,
+        112
+      ],
+      "webhookId": "98141f4f-4f1a-4890-bf0a-edea7730c954",
+      "credentials": {
+        "telegramApi": {
+          "id": "OwmkcNk2GUkjBq16",
+          "name": "Telegram account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "approved",
+              "leftValue": "={{ $json.data.approved }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "hasemail",
+              "leftValue": "={{ $(\"Prepare Reminders\").item.json.hasEmail }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0e3a82cc-20d0-4431-ae51-6442062c9b62",
+      "name": "Approved & has email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1248,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $(\"Prepare Reminders\").item.json.contact_email }}",
+        "subject": "=Following up — {{ $(\"Prepare Reminders\").item.json.company }}",
+        "message": "=<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.7;color:#222222;padding:32px;background-color:#ffffff;\">{{ $(\"Draft Follow-up\").item.json.output.replace(/\\[([^\\]]+)\\]\\([^)]*\\)/g, \"$1\").replaceAll(\"&\",\"&amp;\").replaceAll(\"<\",\"&lt;\").replaceAll(\">\",\"&gt;\").replaceAll(\"\\n\",\"<br>\") }}</div>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "2b67b69f-b65f-4d43-8c57-da70843bd9ac",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1472,
+        16
+      ],
+      "webhookId": "5ff56fe4-ef60-4591-9d12-ff756c8484e1",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1AslH2SfF8ykqu-GWRlAs27WXd_jM4LgMl5cH7Bki8-s",
+          "mode": "list",
+          "cachedResultName": "freelnc",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1AslH2SfF8ykqu-GWRlAs27WXd_jM4LgMl5cH7Bki8-s/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "prospects"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "lead_id"
+          ],
+          "value": {
+            "lead_id": "={{ $(\"Prepare Reminders\").item.json.lead_id }}",
+            "followup_stage": "={{ $(\"Prepare Reminders\").item.json.newStage }}",
+            "status": "={{ $(\"Prepare Reminders\").item.json.newStatus }}",
+            "next_followup_at": "={{ $(\"Prepare Reminders\").item.json.nextIso }}",
+            "last_contacted_at": "={{ $(\"Prepare Reminders\").item.json.lastContactedIso }}"
+          },
+          "schema": [
+            {
+              "id": "lead_id",
+              "displayName": "lead_id",
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "followup_stage",
+              "displayName": "followup_stage",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "next_followup_at",
+              "displayName": "next_followup_at",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "last_contacted_at",
+              "displayName": "last_contacted_at",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "53984a36-0599-4a06-ace6-2c37e8a10627",
+      "name": "Advance (sent)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1696,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1AslH2SfF8ykqu-GWRlAs27WXd_jM4LgMl5cH7Bki8-s",
+          "mode": "list",
+          "cachedResultName": "freelnc",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1AslH2SfF8ykqu-GWRlAs27WXd_jM4LgMl5cH7Bki8-s/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "prospects"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "lead_id"
+          ],
+          "value": {
+            "lead_id": "={{ $(\"Prepare Reminders\").item.json.lead_id }}",
+            "followup_stage": "={{ $(\"Prepare Reminders\").item.json.newStage }}",
+            "status": "={{ $(\"Prepare Reminders\").item.json.newStatus }}",
+            "next_followup_at": "={{ $(\"Prepare Reminders\").item.json.nextIso }}",
+            "last_contacted_at": "={{ $(\"Prepare Reminders\").item.json.lastContactedIso }}"
+          },
+          "schema": [
+            {
+              "id": "lead_id",
+              "displayName": "lead_id",
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "followup_stage",
+              "displayName": "followup_stage",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "next_followup_at",
+              "displayName": "next_followup_at",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            },
+            {
+              "id": "last_contacted_at",
+              "displayName": "last_contacted_at",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "display": true,
+              "required": false,
+              "defaultMatch": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c448a156-5e33-4f30-a6b0-00add421fb4d",
+      "name": "Advance (skipped)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1472,
+        208
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily 9am": {
+      "main": [
+        [
+          {
+            "node": "Read Prospects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Prospects": {
+      "main": [
+        [
+          {
+            "node": "Prepare Reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Reminders": {
+      "main": [
+        [
+          {
+            "node": "Draft Follow-up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft Follow-up": {
+      "main": [
+        [
+          {
+            "node": "Ask Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Draft Follow-up",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Approval": {
+      "main": [
+        [
+          {
+            "node": "Approved & has email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approved & has email?": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Advance (skipped)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Advance (sent)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "errorWorkflow": "ewa56KIP8xaFiHTG"
+  },
+  "versionId": "8750eaa2-e374-4c34-b869-442e42e345a3",
+  "meta": {
+    "instanceId": "bbe63525abda93c4dffbb2bab32ee46dd97dc7395c0c926270cce113ce106012"
+  },
+  "nodeGroups": [],
+  "id": "6YEL5wQCokAOp9y3",
+  "tags": []
+}

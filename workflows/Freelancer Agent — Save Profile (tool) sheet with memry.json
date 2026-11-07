@@ -1,0 +1,307 @@
+{
+  "name": "Freelancer Agent — Save Profile (tool) sheet with memry",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "chat_id"
+            },
+            {
+              "name": "profession"
+            },
+            {
+              "name": "services"
+            },
+            {
+              "name": "usp"
+            },
+            {
+              "name": "ideal_client"
+            },
+            {
+              "name": "voice"
+            },
+            {
+              "name": "extra_notes"
+            },
+            {
+              "name": "full_name"
+            },
+            {
+              "name": "phone"
+            },
+            {
+              "name": "portfolio"
+            }
+          ]
+        }
+      },
+      "id": "77d87cd0-9efd-4e94-a539-3b98c0bc4519",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $input.first().json || {};\nreturn [{ json: {\n  chat_id: String(j.chat_id || ''),\n  full_name: j.full_name || '',\n  phone: j.phone || '',\n  portfolio: j.portfolio || '',\n  profession: j.profession || '',\n  services: j.services || '',\n  usp: j.usp || '',\n  ideal_client: j.ideal_client || '',\n  voice: j.voice || '',\n  extra_notes: j.extra_notes || '',\n  profile_updated_at: $now.toISO(),\n} }];"
+      },
+      "id": "822a26f6-0c8b-4145-9ccb-6cbc88eaaa86",
+      "name": "Build Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "CkGiazgYZOGcnklc",
+          "cachedResultName": "user_profile"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "chat_id",
+              "keyValue": "={{ $json.chat_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chat_id": "={{ $json.chat_id }}",
+            "profession": "={{ $json.profession }}",
+            "services": "={{ $json.services }}",
+            "usp": "={{ $json.usp }}",
+            "ideal_client": "={{ $json.ideal_client }}",
+            "voice": "={{ $json.voice }}",
+            "extra_notes": "={{ $json.extra_notes }}",
+            "profile_updated_at": "={{ $json.profile_updated_at }}",
+            "mem_version": 0,
+            "full_name": "={{ $json.full_name }}",
+            "phone": "={{ $json.phone }}",
+            "portfolio": "={{ $json.portfolio }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "profession",
+              "displayName": "profession",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "services",
+              "displayName": "services",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "usp",
+              "displayName": "usp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "ideal_client",
+              "displayName": "ideal_client",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "voice",
+              "displayName": "voice",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "extra_notes",
+              "displayName": "extra_notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "profile_updated_at",
+              "displayName": "profile_updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "mem_version",
+              "displayName": "mem_version",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "full_name",
+              "displayName": "full_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "portfolio",
+              "displayName": "portfolio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "b0522466-80ff-42bb-a7a9-697ec00202b2",
+      "name": "Upsert Profile",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "result",
+              "value": "=Saved your business profile. Profession: {{ $(\"Build Row\").first().json.profession }}. I will now tailor lead scoring, research and outreach to this.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4e64df66-ab4e-44e6-8755-8be7b270adb7",
+      "name": "Respond",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Build Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Row": {
+      "main": [
+        [
+          {
+            "node": "Upsert Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Profile": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "errorWorkflow": "ewa56KIP8xaFiHTG"
+  },
+  "versionId": "9eedd617-360a-46ee-849c-0cd24b8fd606",
+  "meta": {
+    "instanceId": "bbe63525abda93c4dffbb2bab32ee46dd97dc7395c0c926270cce113ce106012"
+  },
+  "nodeGroups": [],
+  "id": "L2gE83ymYDTK9HFR",
+  "tags": []
+}

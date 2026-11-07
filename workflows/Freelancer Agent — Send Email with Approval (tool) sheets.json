@@ -1,0 +1,243 @@
+{
+  "name": "Freelancer Agent — Send Email with Approval (tool) sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "to"
+            },
+            {
+              "name": "subject"
+            },
+            {
+              "name": "body"
+            },
+            {
+              "name": "chat_id"
+            }
+          ]
+        }
+      },
+      "id": "b7299a32-81a8-4608-9fb4-089ea1d82df3",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "={{ $json.chat_id }}",
+        "message": "=Ready to send this email — approve to send, or decline to cancel.\n\nTo: {{ $json.to }}\nSubject: {{ $json.subject }}\n\n{{ $json.body }}",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double",
+            "approveLabel": "✅ Send it",
+            "disapproveLabel": "❌ Cancel"
+          }
+        },
+        "chatApproval": true,
+        "options": {
+          "limitWaitTime": {
+            "values": {
+              "resumeAmount": 24
+            }
+          },
+          "appendAttribution": false
+        }
+      },
+      "id": "69f9dfba-4ec2-4d18-98f2-8427014a976d",
+      "name": "Ask Approval",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        224,
+        96
+      ],
+      "webhookId": "458aed74-9642-4375-ba4f-3618ec1c33cd",
+      "credentials": {
+        "telegramApi": {
+          "id": "OwmkcNk2GUkjBq16",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "approved",
+              "leftValue": "={{ $json.data.approved }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b6d625e8-a472-47d5-9d45-3374c2948540",
+      "name": "Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('When Called').first().json.to }}",
+        "subject": "={{ $('When Called').first().json.subject }}",
+        "message": "=<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.7;color:#222222;padding:32px;background-color:#ffffff;\">{{ $('When Called').first().json.body.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('\\n','<br>') }}</div>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "1163187b-0880-4e9e-a122-3744e4c66676",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        0
+      ],
+      "webhookId": "79512b13-a10c-4894-a11f-caed9418d414",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "cP39swVotEWfzdPL",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "result",
+              "name": "result",
+              "type": "string",
+              "value": "=✅ Email sent to {{ $('When Called').first().json.to }}."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d462f0f6-8d11-42a4-8e27-a5b18f5f7fec",
+      "name": "Sent Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        896,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "result",
+              "name": "result",
+              "type": "string",
+              "value": "The freelancer declined — the email was NOT sent. Do not retry unless they ask."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1f956a26-9ac9-42b5-b6de-ccee26eba715",
+      "name": "Declined Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        192
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Ask Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Approval": {
+      "main": [
+        [
+          {
+            "node": "Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approved?": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Declined Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Sent Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "errorWorkflow": "ewa56KIP8xaFiHTG"
+  },
+  "versionId": "fa2758b5-f48b-4dc8-8b98-5d20d29ae4c1",
+  "meta": {
+    "instanceId": "bbe63525abda93c4dffbb2bab32ee46dd97dc7395c0c926270cce113ce106012"
+  },
+  "nodeGroups": [],
+  "id": "oovs2DrfqRlH2dLS",
+  "tags": []
+}
