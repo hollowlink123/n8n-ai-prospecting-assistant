@@ -5,7 +5,7 @@
 [![OpenAI](https://img.shields.io/badge/AI-OpenAI-412991?logo=openai&logoColor=white)](https://openai.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-An AI-powered Telegram assistant built with n8n that helps freelancers discover potential clients, research businesses, collect contact information, prepare personalized outreach emails, and manage their prospect pipeline.
+An AI-powered Telegram prospecting assistant built with n8n. It helps freelancers find potential clients, research businesses, collect contact information, and prepare personalized outreach emails. **Every email requires your approval in Telegram before it is sent through Gmail.**
 
 ## Demo
 
@@ -29,6 +29,10 @@ Prospects can be saved to Google Sheets and tracked through follow-ups. Emails a
 6. **Approve emails:** Review the draft in Telegram and approve or cancel it before Gmail sends anything.
 7. **Manage prospects:** Save businesses to Google Sheets, update their status, and receive scheduled follow-up reminders.
 8. **Prepare for calls:** Receive research notes and suggested questions before scheduled discovery calls.
+
+## Architecture
+
+The system consists of a central Telegram assistant, supporting n8n workflows, external services, and two scheduled automations.
 
 ## Architecture
 
@@ -87,7 +91,7 @@ flowchart TD
 
 The repository contains nine n8n workflow JSON files:
 
-| Workflow | What it does |
+| **Workflow** | **What it does** |
 |---|---|
 | **Main Bot** | Receives Telegram messages, manages conversation context, and coordinates the assistant's tools. |
 | **Save Profile** | Stores or updates the freelancer's profile in an n8n Data Table. |
@@ -118,7 +122,9 @@ You will need your own accounts and credentials for:
 - ScrapingBee
 - Jina AI Reader
 
-Third-party services may have usage costs.
+**Running n8n:** You can use n8n Cloud or self-host n8n using its free Community Edition. Self-hosting avoids an n8n Cloud subscription, but you may still have hosting and infrastructure costs.
+
+**Costs:** Google Places API, OpenAI, ScrapingBee, and other connected services may have usage-based charges. Actual costs depend on your usage and the providers' pricing. Check their current pricing before running the workflows.
 
 ## Setup
 
@@ -133,4 +139,4 @@ For detailed installation steps, credential configuration, workflow connections,
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
