@@ -34,10 +34,6 @@ Prospects can be saved to Google Sheets and tracked through follow-ups. Emails a
 
 The system consists of a central Telegram assistant, supporting n8n workflows, external services, and two scheduled automations.
 
-## Architecture
-
-The system consists of a central Telegram assistant, supporting n8n workflows, external services, and two scheduled automations.
-
 ```mermaid
 flowchart TD
     U["User"] --> TG["Telegram"]
